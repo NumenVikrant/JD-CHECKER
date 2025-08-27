@@ -43,11 +43,13 @@
       </button>
     </div>
 
+    <!-- Response Box -->
     <div
-  id="responseBox"
-  class=" mt-6 p-6 bg-white border rounded-xl text-gray-800 hidden shadow-xl mx-auto ml-12 mr-12"
-></div>
+      id="responseBox"
+      class="mt-6 p-6 bg-white border rounded-xl text-gray-800 hidden shadow-xl mx-auto ml-12 mr-12"
+    ></div>
 
+    <!-- Lenovo Footer Logo -->
     <img
       src="https://origin-brandworld.lenovo.com/wp-content/uploads/2024/01/Overview_LogoLockup-Deep-HorizLeft-768x159.png"
       alt="Lenovo Logo"
@@ -60,6 +62,14 @@
       const jdInput = document.getElementById("jdInput");
       const responseBox = document.getElementById("responseBox");
 
+      // Loader HTML
+      const loaderHTML = `
+        <div class="flex flex-col items-center justify-center">
+          <div class="w-10 h-10 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
+          <p class="mt-3 text-gray-600">⏳ Checking JD with AI...</p>
+        </div>
+      `;
+
       checkBtn.addEventListener("click", async () => {
         const prompt = jdInput.value.trim();
         if (!prompt) {
@@ -68,7 +78,7 @@
         }
 
         responseBox.classList.remove("hidden");
-        responseBox.innerHTML = "⏳ Checking JD with AI...";
+        responseBox.innerHTML = loaderHTML;
 
         try {
           const res = await fetch(
