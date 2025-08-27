@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JD Checker - Lenovo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body
+    class="min-h-screen flex flex-col items-center justify-center bg-gray-100 bg-gradient-to-r from-pink-500 via-purple-500"
+    style="
+      background-image: url('https://origin-brandworld.lenovo.com/wp-content/uploads/2024/01/Pattern_SG-Pale-1-1-768x768.png');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center;
+    "
+  >
+    <!-- Lenovo Logo -->
+    <img
+      src="https://origin-brandworld.lenovo.com/wp-content/uploads/2022/06/LenovoLogo_POS-Red-H-2048x683.png"
+      alt="Lenovo Logo"
+      class="w-69 h-24 mb-6 hover:-translate-y-2 transition duration-[500ms]"
+    />
+    
+    <!-- Input Card -->
+    <div class="w-full max-w-xl bg-white shadow-lg rounded-2xl p-6">
+      <h1 class="text-2xl font-bold text-center mb-4">
+        Job Description Checker
+      </h1>
+
+      <textarea
+        id="jdInput"
+        placeholder="Paste Job Description here..."
+        class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
+        rows="5"
+      ></textarea>
+
+      <button
+        id="checkBtn"
+        class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
+      >
+        Check JD
+      </button>
+    </div>
+
+    <div
+  id="responseBox"
+  class=" mt-6 p-6 bg-white border rounded-xl text-gray-800 hidden shadow-xl mx-auto ml-12 mr-12"
+></div>
+
+    <img
+      src="https://origin-brandworld.lenovo.com/wp-content/uploads/2024/01/Overview_LogoLockup-Deep-HorizLeft-768x159.png"
+      alt="Lenovo Logo"
+      class="w-full max-w-xl h-21 mb-6 mt-10 border rounded-2xl"
+    />
+
+    <script>
+      const API_KEY = "AIzaSyDp2Fz9Wesv7irKhgzXNVoH6Wh4lo6NFyM"; // replace with your Gemini API key
+      const checkBtn = document.getElementById("checkBtn");
+      const jdInput = document.getElementById("jdInput");
+      const responseBox = document.getElementById("responseBox");
+
+      checkBtn.addEventListener("click", async () => {
+        const prompt = jdInput.value.trim();
+        if (!prompt) {
+          alert("Please paste a Job Description first!");
+          return;
+        }
+
+        responseBox.classList.remove("hidden");
+        responseBox.innerHTML = "⏳ Checking JD with AI...";
+
+        try {
+          const res = await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
+              API_KEY,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `You are a Job Description Quality Checker.
+Analyze the following Job Description for:
+1. Grammar or spelling mistakes
+2. Formatting inconsistencies
+3. Bias or discriminatory wording
+
+Then provide a corrected and well-structured Job Description that is error free.
+
+Job Description:
+${prompt}`,
+                      },
+                    ],
+                  },
+                ],
+              }),
+            }
+          );
+
+          const data = await res.json();
+          const aiResponse =
+            data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+            "⚠️ No response from AI";
+
+          responseBox.innerHTML =
+            "<strong>AI Response:</strong><br>" +
+            aiResponse.replace(/\n/g, "<br>");
+        } catch (err) {
+          responseBox.innerHTML = "❌ Error: " + err.message;
+        }
+      });
+    </script>
+  </body>
+</html>
