@@ -4,7 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JD Checker - Lenovo</title>
+    <link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PDF.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   </head>
   <body
     class="min-h-screen flex flex-col items-center justify-center bg-gray-100 bg-gradient-to-r from-pink-500 via-purple-500"
@@ -20,20 +25,30 @@
       src="https://origin-brandworld.lenovo.com/wp-content/uploads/2022/06/LenovoLogo_POS-Red-H-2048x683.png"
       alt="Lenovo Logo"
       class="w-69 h-24 mb-6 hover:-translate-y-2 transition duration-[500ms]"
+      data-aos="fade-up"
     />
-    
+
     <!-- Input Card -->
     <div class="w-full max-w-xl bg-white shadow-lg rounded-2xl p-6">
       <h1 class="text-2xl font-bold text-center mb-4">
         Job Description Checker
       </h1>
 
+      <!-- Textarea input -->
       <textarea
         id="jdInput"
         placeholder="Paste Job Description here..."
-        class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
+        class="w-full p-3 border rounded-lg mb-4 focus:outline-none border-red-600 border-2"
         rows="5"
       ></textarea>
+
+      <!-- File Upload -->
+      <input
+        type="file"
+        id="fileInput"
+        accept="application/pdf"
+        class="w-full mb-4"
+      />
 
       <button
         id="checkBtn"
@@ -43,26 +58,76 @@
       </button>
     </div>
 
+    <!-- Rating Box -->
+    <div
+      id="ratingBox"
+      class="mt-6 p-6 bg-white border rounded-xl text-gray-800 hidden shadow-xl w-full max-w-xl text-center"
+    >
+      <h1 class="text-2xl font-bold mb-2">JD Quality Rating</h1>
+      <div
+        id="stars"
+        class="flex justify-center text-yellow-400 text-5xl space-x-2"
+      ></div>
+    </div>
+
+    <!-- Mistakes Box -->
+    <div
+      id="mistakesBox"
+      class="mt-6 p-6 bg-white border rounded-xl text-gray-800 hidden shadow-xl w-full max-w-6xl"
+    >
+      <h1 class="text-2xl font-bold mb-4 text-center">Mistakes & Analysis</h1>
+      <div id="mistakesContent" class="space-y-6"></div>
+    </div>
+
     <!-- Response Box -->
     <div
       id="responseBox"
-      class="mt-6 p-6 bg-white border rounded-xl text-gray-800 hidden shadow-xl mx-auto ml-12 mr-12"
+      class="mt-6 p-6 bg-white border rounded-xl text-gray-800 hidden shadow-xl w-full max-w-6xl"
     ></div>
+
+    <!-- Floating Download Button -->
+    <button
+      id="downloadBtn"
+      class="fixed bottom-6 right-6 bg-green-600 text-white px-5 py-3 rounded-full shadow-lg hover:bg-green-700 hidden"
+    >
+      ⬇ Download JD PDF
+    </button>
 
     <!-- Lenovo Footer Logo -->
     <img
       src="https://origin-brandworld.lenovo.com/wp-content/uploads/2024/01/Overview_LogoLockup-Deep-HorizLeft-768x159.png"
       alt="Lenovo Logo"
       class="w-full max-w-xl h-21 mb-6 mt-10 border rounded-2xl"
+      data-aos="fade-down"
     />
 
+    <!-- Loader Overlay -->
+    <div
+      id="loader"
+      class="hidden fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50"
+    >
+      <div
+        class="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"
+      ></div>
+    </div>
+
     <script>
-      const API_KEY = "AIzaSyDsQfZA4fa5rHxU0zS0YFtimBSSeGTejUk"; // replace with your Gemini API key
+      const { jsPDF } = window.jspdf;
+
+      const API_KEY = "AIzaSyA5pbiIcEdssePO8AlCV0gQcQn6C01Oc_I";
       const checkBtn = document.getElementById("checkBtn");
       const jdInput = document.getElementById("jdInput");
+      const fileInput = document.getElementById("fileInput");
       const responseBox = document.getElementById("responseBox");
+      const ratingBox = document.getElementById("ratingBox");
+      const starsDiv = document.getElementById("stars");
+      const mistakesBox = document.getElementById("mistakesBox");
+      const mistakesContent = document.getElementById("mistakesContent");
+      const downloadBtn = document.getElementById("downloadBtn");
 
-      // Loader HTML
+      let refinedJD = ""; // store refined JD separately
+
+      // Loader
       const loaderHTML = `
         <div class="flex flex-col items-center justify-center">
           <div class="w-10 h-10 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
@@ -70,15 +135,59 @@
         </div>
       `;
 
+      // Extract PDF Text using pdf.js
+      async function extractPDFText(file) {
+        const reader = new FileReader();
+        return new Promise((resolve, reject) => {
+          reader.onload = async function () {
+            const typedarray = new Uint8Array(this.result);
+            const pdf = await pdfjsLib.getDocument(typedarray).promise;
+            let text = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const content = await page.getTextContent();
+              const pageText = content.items.map((item) => item.str).join(" ");
+              text += pageText + "\n";
+            }
+            resolve(text);
+          };
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(file);
+        });
+      }
+
+      // Render stars
+      function renderStars(rating) {
+        starsDiv.innerHTML = "";
+        for (let i = 1; i <= 5; i++) {
+          if (i <= rating) {
+            starsDiv.innerHTML += "★";
+          } else {
+            starsDiv.innerHTML += "☆";
+          }
+        }
+      }
+
       checkBtn.addEventListener("click", async () => {
-        const prompt = jdInput.value.trim();
+        let prompt = jdInput.value.trim();
+
+        if (fileInput.files.length > 0) {
+          const file = fileInput.files[0];
+          prompt = await extractPDFText(file);
+        }
+
         if (!prompt) {
-          alert("Please paste a Job Description first!");
+          alert("Please paste a Job Description or upload a PDF!");
           return;
         }
 
-        responseBox.classList.remove("hidden");
-        responseBox.innerHTML = loaderHTML;
+        // Show loader overlay
+        document.getElementById("loader").classList.remove("hidden");
+
+        responseBox.classList.add("hidden");
+        ratingBox.classList.add("hidden");
+        mistakesBox.classList.add("hidden");
+        downloadBtn.classList.add("hidden");
 
         try {
           const res = await fetch(
@@ -93,12 +202,23 @@
                     parts: [
                       {
                         text: `You are a Job Description Quality Checker.
-Analyze the following Job Description for:
-1. Grammar or spelling mistakes
-2. Formatting inconsistencies
-3. Bias or discriminatory wording
 
-Then provide a corrected and well-structured Job Description that is error free.
+First, provide a rating (1 to 5) for the Job Description quality (just the number).
+
+Then, return 3 HTML tables in the following exact format (do not include extra explanations, just valid HTML tables):
+1. DETAILS table (with criteria, status ✅❌, and suggestions).
+2. LANGUAGE table (same format).
+3. FORMAT table (same format).
+
+After the tables, provide the corrected and well-structured Job Description. 
+The refined JD must strictly follow these criteria:
+- Written in 3–5 bullet points
+- No jargon or unfamiliar acronyms
+- Between 700–2000 characters
+- Simple, normal job titles
+- Includes relevant keywords (but no "preferred qualifications")
+- Includes benefits (like remote work & flexibility)
+- Gender-neutral, no stereotypes
 
 Job Description:
 ${prompt}`,
@@ -115,13 +235,73 @@ ${prompt}`,
             data?.candidates?.[0]?.content?.parts?.[0]?.text ||
             "⚠️ No response from AI";
 
+          // Extract rating
+          const ratingMatch = aiResponse.match(/\b[1-5]\b/);
+          if (ratingMatch) {
+            renderStars(parseInt(ratingMatch[0]));
+            ratingBox.classList.remove("hidden");
+          }
+
+          // Extract tables
+          const tables = aiResponse.match(/<table[\s\S]*?<\/table>/g);
+          if (tables) {
+            const sectionTitles = [
+              " Job Details & Structure",
+              " Language & Tone",
+              " Formatting & Presentation",
+            ];
+
+            mistakesContent.innerHTML = tables
+              .map((t, i) => {
+                return `
+        <h2 class="text-lg font-bold text-gray-800 mb-2 mt-6">${
+          sectionTitles[i] || "Analysis"
+        }</h2>
+        ${t
+          .replace(
+            "<table",
+            '<table class="min-w-full border border-gray-300 rounded-lg shadow-sm text-sm"'
+          )
+          .replace(
+            /<th>/g,
+            '<th class="border border-gray-300 bg-gray-100 px-4 py-2 text-left font-semibold">'
+          )
+          .replace(/<td>/g, '<td class="border border-gray-300 px-4 py-2">')}`;
+              })
+              .join("<br><br>");
+
+            mistakesBox.classList.remove("hidden");
+          }
+
+          // Extract refined JD (remove tables and rating)
+          refinedJD = aiResponse.replace(/<table[\s\S]*?<\/table>/g, "").trim();
+
           responseBox.innerHTML =
-            "<strong>AI Response:</strong><br>" +
-            aiResponse.replace(/\n/g, "<br>");
+            "<strong>Refined JD:</strong><br>" +
+            refinedJD.replace(/\n/g, "<br>");
+
+          // Show Download button
+          downloadBtn.classList.remove("hidden");
+          document.getElementById("loader").classList.add("hidden");
+          responseBox.classList.remove("hidden");
         } catch (err) {
           responseBox.innerHTML = "❌ Error: " + err.message;
+          document.getElementById("loader").classList.add("hidden");
+          responseBox.classList.remove("hidden");
         }
       });
+
+      // Download JD as PDF
+      downloadBtn.addEventListener("click", () => {
+        const doc = new jsPDF();
+        const lines = doc.splitTextToSize(refinedJD, 180);
+        doc.text(lines, 10, 20);
+        doc.save("Refined_Job_Description.pdf");
+      });
+    </script>
+    <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
+    <script>
+      AOS.init({ duration: 1000, once: true });
     </script>
   </body>
 </html>
